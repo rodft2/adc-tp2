@@ -115,7 +115,22 @@ def pagina_painel():
     tipo = getattr(state, 'tipo', None)
     ref_id = getattr(state, 'ref_id', None)
 
-    ui.label(f"Bem-vindo ao painel ({tipo})").classes('text-2xl')
+    conn = sqlite3.connect("data.db")
+    cursor = conn.cursor()
+
+    if tipo == 'paciente':
+        cursor.execute("SELECT nome FROM pacientes WHERE id = ?", (ref_id,))
+        nome = cursor.fetchone()
+        if nome:
+            ui.label(f"Bem-vindo {nome[0]}!").classes('text-2xl')
+    elif tipo == 'medico':
+        cursor.execute("SELECT nome FROM medicos WHERE id = ?", (ref_id,))
+        nome = cursor.fetchone()
+        if nome:
+            ui.label(f"Bem-vindo Dr(a). {nome[0]}!").classes('text-2xl')
+
+    conn.close()
+
     ui.button('Logout', on_click=lambda: ui.navigate.to('/logout')).classes('mb-4')
 
     if tipo == 'paciente':
@@ -123,6 +138,7 @@ def pagina_painel():
     elif tipo == 'medico':
         ver_consultas_medico(ref_id)
         agendar_para_pacientes(ref_id)
+
 
 
 def ver_consultas_paciente(paciente_id):
@@ -157,7 +173,66 @@ def ver_consultas_medico(medico_id):
     conn.close()
 
     for nome, email, c_id, d, m, y in consultas:
-        ui.label(f"Consulta #{c_id} - {d:02d}/{m:02d}/{y} com {nome} ({email})")
+        with ui.row():
+            ui.label(f"Consulta #{c_id} - {d:02d}/{m:02d}/{y} com {nome} ({email})")
+            ui.button('Reagendar', on_click=lambda c_id=c_id: abrir_reagendar(c_id)).classes('ml-2')
+            ui.button('Terminar', on_click=lambda c_id=c_id: terminar_consulta(c_id)).classes('ml-2')
+
+
+def terminar_consulta(consulta_id):
+    conn = sqlite3.connect("data.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM calendario WHERE id_consulta = ?", (consulta_id,))
+    cursor.execute("DELETE FROM consultas WHERE id = ?", (consulta_id,))
+    conn.commit()
+    conn.close()
+
+    ui.notify('Consulta terminada com sucesso!', type='positive')
+
+def abrir_reagendar(consulta_id):
+    with ui.dialog() as dialog, ui.card():
+        ui.label('Reagendar Consulta').classes('text-xl')
+        day = ui.input('Novo Dia').props('type=number')
+        month = ui.input('Novo Mês').props('type=number')
+        year = ui.input('Novo Ano').props('type=number')
+        resultado = ui.label()
+
+        def salvar_nova_data():
+            if not (day.value and day.value.isdigit()) or not (month.value and month.value.isdigit()) or not (year.value and year.value.isdigit()):
+                resultado.text = 'Preencha a data corretamente.'
+                return
+
+            dia = int(day.value)
+            mes = int(month.value)
+            ano = int(year.value)
+
+            if not (1 <= dia <= 31 and 1 <= mes <= 12 and 2024 <= ano):
+                resultado.text = 'Data inválida: verifique o dia, mês e ano.'
+                return
+
+            if mes == 2 and dia > 29:
+                resultado.text = 'Fevereiro não tem mais de 29 dias.'
+                return
+            if mes in [4, 6, 9, 11] and dia > 30:
+                resultado.text = 'Este mês tem apenas 30 dias.'
+                return
+
+            conn = sqlite3.connect("data.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE calendario
+                SET day = ?, month = ?, year = ?
+                WHERE id_consulta = ?
+            """, (dia, mes, ano, consulta_id))
+            conn.commit()
+            conn.close()
+            dialog.close()
+            ui.notify('Consulta reagendada com sucesso!', type='positive')
+            ui.navigate.to('/painel')
+
+        ui.button('Salvar', on_click=salvar_nova_data).classes('mt-4')
+
+    dialog.open()
 
 
 def agendar_para_pacientes(medico_id):
@@ -175,6 +250,43 @@ def agendar_para_pacientes(medico_id):
     month = ui.input('Mês').props('type=number')
     year = ui.input('Ano').props('type=number')
     resultado = ui.label()
+
+    def marcar():
+        if not paciente_select.value:
+            resultado.text = 'Selecione um paciente.'
+            return
+        if not (day.value and day.value.isdigit()) or not (month.value and month.value.isdigit()) or not (year.value and year.value.isdigit()):
+            resultado.text = 'Preencha a data corretamente.'
+            return
+
+        dia = int(day.value)
+        mes = int(month.value)
+        ano = int(year.value)
+
+        if not (1 <= dia <= 31 and 1 <= mes <= 12 and 2024 <= ano):
+            resultado.text = 'Data inválida: verifique o dia, mês e ano.'
+            return
+
+        if mes == 2 and dia > 29:
+            resultado.text = 'Fevereiro não tem mais de 29 dias.'
+            return
+        if mes in [4, 6, 9, 11] and dia > 30:
+            resultado.text = 'Este mês tem apenas 30 dias.'
+            return
+
+        conn = sqlite3.connect("data.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO consultas (id_paciente, id_medicos) VALUES (?, ?)",
+                       (paciente_map[paciente_select.value], medico_id))
+        id_consulta = cursor.lastrowid
+        cursor.execute("INSERT INTO calendario (day, month, year, id_consulta) VALUES (?, ?, ?, ?)",
+                       (dia, mes, ano, id_consulta))
+        conn.commit()
+        conn.close()
+        resultado.text = 'Consulta agendada com sucesso.'
+
+    ui.button('Agendar', on_click=marcar)
+
 
     def marcar():
         if not paciente_select.value:
