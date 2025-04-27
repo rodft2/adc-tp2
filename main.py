@@ -1,48 +1,36 @@
 import sqlite3
-import features
-def main():
 
+def main():
     conn = sqlite3.connect("data.db")
     cursor = conn.cursor()
 
-    # Read and run the SQL script
     with open("data.sql", "r", encoding="utf-8") as f:
         sql_script = f.read()
 
     cursor.executescript(sql_script)
+    conn.commit()
+
+    # Criar utilizador médico de teste, se não existir
+    cursor.execute("SELECT COUNT(*) FROM medicos")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO medicos (nome, especialidade, cartao_medicos) VALUES (?, ?, ?)",
+                       ("Dr. João Teste", "cardiologia", "12345678"))
+        id_medico = cursor.lastrowid
+        cursor.execute("INSERT OR IGNORE INTO utilizadores (email, senha, tipo, id_referencia) VALUES (?, ?, 'medico', ?)",
+                       ("medico@teste.pt", "med123", id_medico))
+
+    # Criar utilizador paciente de teste, se não existir
+    cursor.execute("SELECT COUNT(*) FROM pacientes")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO pacientes (nome, email, cartao_paciente) VALUES (?, ?, ?)",
+                       ("Maria Paciente", "paciente@teste.pt", "87654321"))
+        id_paciente = cursor.lastrowid
+        cursor.execute("INSERT OR IGNORE INTO utilizadores (email, senha, tipo, id_referencia) VALUES (?, ?, 'paciente', ?)",
+                       ("paciente@teste.pt", "pac123", id_paciente))
 
     conn.commit()
     conn.close()
-    menu()
-
-def menu():
-    while True:
-        print("--------------------------------------")
-        print("Sistema de Consultas")
-        print("1. Registar paciente")
-        print("2. Registar medico")
-        print("3. visualizar agenda do medico")
-        print("4. Agendar consulta")
-        print("0. Sair")
-        print("--------------------------------------")
-
-        opcao = input("Escolha uma opção: ")
-
-        if opcao == "1":
-            #registar_paciente()
-            pass
-        elif opcao == "2":
-            #registar_medico()
-            pass
-        elif opcao == "3":
-            features.ver_agenda()
-        elif opcao == "4":
-            features.agendar_consulta()
-        elif opcao == "0":
-            break
-        else:
-            print("opcao invalida. Tente novamente")
-
+    print("Base de dados preparada com dados de teste.")
 
 if __name__ == "__main__":
     main()

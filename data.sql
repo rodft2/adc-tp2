@@ -1,32 +1,45 @@
 
 
-Create Table if not exists pacientes (
-    id integer primary key Autoincrement,
-    nome text not null,
-    email text not null,
-    cartao_paciente integer unique not null
+-- Tabela de pacientes
+CREATE TABLE IF NOT EXISTS pacientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    email TEXT NOT NULL,
+    cartao_paciente TEXT NOT NULL
 );
 
-Create Table if not exists medicos (
-    id integer primary key Autoincrement,
-    nome text not null,
-    especialidade text,
-    cartao_medicos integer unique not null
+-- Tabela de médicos
+CREATE TABLE IF NOT EXISTS medicos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    especialidade TEXT NOT NULL,
+    cartao_medicos TEXT NOT NULL
 );
 
-Create Table if not exists consultas (
-    id integer primary key Autoincrement,
-    id_paciente integer,
-    id_medicos integer,
-    foreign key (id_paciente) references pacientes(id),
-    foreign key (id_medicos) references medicos(id)
+-- Tabela de consultas
+CREATE TABLE IF NOT EXISTS consultas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_paciente INTEGER NOT NULL,
+    id_medicos INTEGER NOT NULL,
+    FOREIGN KEY (id_paciente) REFERENCES pacientes(id),
+    FOREIGN KEY (id_medicos) REFERENCES medicos(id)
 );
 
-Create Table if not exists calendario (
-    id_consulta integer,
-    day integer,
-    month integer,
-    year  integer,
-    foreign key (id_consulta) references consultas(id)
+-- Tabela de datas das consultas
+CREATE TABLE IF NOT EXISTS calendario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    id_consulta INTEGER NOT NULL,
+    FOREIGN KEY (id_consulta) REFERENCES consultas(id)
 );
 
+-- Tabela de utilizadores (para login)
+CREATE TABLE IF NOT EXISTS utilizadores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    senha TEXT NOT NULL,
+    tipo TEXT CHECK(tipo IN ('paciente', 'medico')) NOT NULL,
+    id_referencia INTEGER NOT NULL
+);
